@@ -1,0 +1,56 @@
+rules:
+  - id: ssh_invalid_user_burst
+    title: Invalid SSH user burst
+    description: Repeated SSH failures against invalid usernames from the same source.
+    severity: medium
+    source_type: ssh
+    event_type: authentication_failure
+    match:
+      raw_message:
+        contains: "invalid user"
+    aggregation:
+      group_by: source_ip
+      window_seconds: 120
+      threshold: 3
+      function: count
+
+  - id: web_scanner_user_agent
+    title: Scanner user agent detected
+    description: HTTP request matched a known scanning or probing user agent.
+    severity: high
+    source_type: nginx
+    event_type: http_request
+    match:
+      http_user_agent:
+        regex: "(nikto|sqlmap|masscan|python-requests|curl|nmap)"
+
+  - id: repeated_sensitive_path_access
+    title: Repeated sensitive path access
+    description: The same source requested multiple sensitive paths inside one minute.
+    severity: high
+    source_type: nginx
+    event_type: http_request
+    match:
+      http_path:
+        regex: "^(/\\.env|/phpmyadmin|/wp-login\\.php|/admin|/\\.git/config)$"
+    aggregation:
+      group_by: source_ip
+      window_seconds: 60
+      threshold: 2
+      function: count
+
+  - id: firewall_multiport_probe
+    title: Multi-port network probe
+    description: The same source touched several destination ports in a short time window.
+    severity: high
+    source_type: firewall
+    event_type: network_connection_attempt
+    match:
+      protocol:
+        regex: "^(TCP|UDP)$"
+    aggregation:
+      group_by: source_ip
+      window_seconds: 30
+      threshold: 5
+      function: distinct_count
+      field: destination_port

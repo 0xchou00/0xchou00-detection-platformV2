@@ -1,0 +1,26 @@
+rules:
+  - id: ssh_bruteforce_plus_portscan
+    conditions:
+      time_window_seconds: 300
+      same_source_ip: true
+      alerts:
+        - detector: brute_force
+        - detector: port_scan
+    output:
+      title: SSH brute force followed by port scan
+      description: The same source triggered SSH brute-force activity and network port scanning inside five minutes.
+      severity: critical
+
+  - id: traffic_spike_plus_sensitive_path
+    conditions:
+      time_window_seconds: 300
+      same_source_ip: true
+      alerts:
+        - detector: anomaly_frequency
+        - detector: suspicious_ip
+          metadata:
+            reason: sensitive_path
+    output:
+      title: Traffic spike paired with sensitive path access
+      description: A traffic anomaly aligned with access to a sensitive web path from the same source IP.
+      severity: high

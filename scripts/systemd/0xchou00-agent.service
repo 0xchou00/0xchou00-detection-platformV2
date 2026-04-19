@@ -1,0 +1,16 @@
+[Unit]
+Description=0xchou00 Detection Tool Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=__PROJECT_ROOT__
+EnvironmentFile=__PROJECT_ROOT__/.env
+ExecStart=__PROJECT_ROOT__/.venv/bin/python __PROJECT_ROOT__/agent/agent.py --config __PROJECT_ROOT__/agent/config.yaml
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
