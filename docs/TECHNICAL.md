@@ -1,10 +1,10 @@
-# 0xchou00 — Lightweight Security Detection Tool
+# 0xchou00 - Lightweight Security Detection Tool
 
 Technical notes for the standalone detection stack.
 
 ## Architecture
 
-`0xchou00 — Lightweight Security Detection Tool` is a single-node detection pipeline with six ordered stages:
+`0xchou00 - Lightweight Security Detection Tool` is a single-node detection pipeline with six ordered stages:
 
 1. raw log ingestion
 2. normalization
@@ -176,3 +176,4 @@ Keeping them in separate detectors preserves better evidence and cleaner correla
 - GeoIP depends on a local database file being present.
 - AbuseIPDB enrichment is optional and best-effort.
 - Port-scan detection depends on firewall-style logs or equivalent normalized network events.
+
