@@ -17,7 +17,7 @@ def _allowed_origins() -> list[str]:
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="0xchou00 — Lightweight Security Detection Tool",
+        title="0xchou00 - Lightweight Security Detection Tool",
         version="0.4.0-beta",
         description="Local logs, normalized events, bounded detections, and correlated alerts.",
     )
@@ -39,3 +39,4 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+
