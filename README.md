@@ -1,4 +1,4 @@
-# 0xchou00 — Lightweight Security Detection Tool
+# 0xchou00 - Lightweight Security Detection Tool
 
 `0xchou00` is a local-first security detection tool with a FastAPI backend and a React SOC dashboard.
 The backend ingests SSH, HTTP, and firewall logs, normalizes them into one event model, enriches source IPs, runs bounded detections, correlates related alerts, and records the stored state in a verifiable integrity chain.
@@ -37,6 +37,56 @@ pip install -r requirements.txt
 cd backend
 uvicorn main:app --reload
 ```
+
+## Linux (Debian / Ubuntu / Kali)
+
+Tested on:
+
+- Debian
+- Ubuntu
+- Kali Linux
+
+Step-by-step installation:
+
+```bash
+git clone https://github.com/0xchou00/0xchou00-Detection-.git
+cd 0xchou00-Detection-
+git checkout fix/linux-compatibility
+chmod +x setup.sh run.sh scripts/install.sh
+./setup.sh
+./run.sh
+```
+
+Service-based setup (systemd):
+
+```bash
+./scripts/install.sh
+sudo systemctl start 0xchou00.service
+sudo systemctl start 0xchou00-agent.service
+```
+
+Run options:
+
+```bash
+# Backend only
+./run.sh --backend-only
+
+# Backend + dashboard + log agent
+./run.sh --with-agent
+```
+
+Common errors and fixes:
+
+- `python3: command not found`
+  - install Python runtime: `sudo apt-get install -y python3 python3-venv python3-pip`
+- `npm: command not found`
+  - install Node/npm: `sudo apt-get install -y nodejs npm`
+- `Dashboard dependencies are missing`
+  - run `./setup.sh` to install `dashboard/node_modules`
+- `Permission denied` when running scripts
+  - run `chmod +x setup.sh run.sh scripts/install.sh`
+- Dashboard CORS request blocked
+  - verify `SIEM_ALLOWED_ORIGINS` in `.env` contains your dashboard URL
 
 API:
 
