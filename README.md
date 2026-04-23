@@ -631,14 +631,6 @@ What was intentionally simplified:
 - enrichment uses local static maps plus optional GeoIP databases
 - detection state is ephemeral and bounded
 
-What is not production-ready:
-
-- Redis is still a single point of failure
-- there is no source-side log signing
-- state recovery after Redis loss is reset-based, not rebuild-based
-- PostgreSQL is still carrying both operational storage and query load
-- the queue-to-database path is not a fully transactional outbox design
-
 What would change at larger scale:
 
 - move live and queue reliability into separate Redis or Kafka deployments
@@ -647,7 +639,7 @@ What would change at larger scale:
 - add background jobs to rebuild derived state after Redis loss
 - add per-message processing journals or an outbox for stricter exactly-once side effects
 
-## 13. Future Improvements (REALISTIC ONLY)
+## 13. Future Improvements
 
 - add dashboard views for dead-letter messages and ingest audit failures
 - add automated state rebuild from PostgreSQL for selected baselines
