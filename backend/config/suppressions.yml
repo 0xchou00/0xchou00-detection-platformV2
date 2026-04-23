@@ -1,0 +1,7 @@
+allowlist:
+  source_ips: []
+  usernames: []
+suppression_rules:
+  - name: internal-health-checks
+    match:
+      user_agent_contains: "kube-probe"

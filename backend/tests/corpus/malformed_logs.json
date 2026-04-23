@@ -1,0 +1,14 @@
+{
+  "entries": [
+    {
+      "timestamp": "2026-04-23T13:00:00+00:00",
+      "source_type": "ssh",
+      "line": "garbled ssh log line that does not match"
+    },
+    {
+      "timestamp": "2026-04-23T13:00:02+00:00",
+      "source_type": "weirdsource",
+      "line": "{\"unexpected\":true,\"kind\":\"blob\"}"
+    }
+  ]
+}

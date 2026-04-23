@@ -1,0 +1,74 @@
+{
+  "entries": [
+    {
+      "timestamp": "2026-04-23T10:00:00+00:00",
+      "source_type": "firewall",
+      "line": "Apr 23 10:00:00 lab kernel: IPTABLES SRC=203.0.113.10 DST=10.0.0.5 PROTO=TCP DPT=22"
+    },
+    {
+      "timestamp": "2026-04-23T10:00:03+00:00",
+      "source_type": "firewall",
+      "line": "Apr 23 10:00:03 lab kernel: IPTABLES SRC=203.0.113.10 DST=10.0.0.5 PROTO=TCP DPT=80"
+    },
+    {
+      "timestamp": "2026-04-23T10:00:06+00:00",
+      "source_type": "firewall",
+      "line": "Apr 23 10:00:06 lab kernel: IPTABLES SRC=203.0.113.10 DST=10.0.0.5 PROTO=TCP DPT=443"
+    },
+    {
+      "timestamp": "2026-04-23T10:00:09+00:00",
+      "source_type": "firewall",
+      "line": "Apr 23 10:00:09 lab kernel: IPTABLES SRC=203.0.113.10 DST=10.0.0.5 PROTO=TCP DPT=8080"
+    },
+    {
+      "timestamp": "2026-04-23T10:00:12+00:00",
+      "source_type": "firewall",
+      "line": "Apr 23 10:00:12 lab kernel: IPTABLES SRC=203.0.113.10 DST=10.0.0.5 PROTO=TCP DPT=3306"
+    },
+    {
+      "timestamp": "2026-04-23T10:00:15+00:00",
+      "source_type": "firewall",
+      "line": "Apr 23 10:00:15 lab kernel: IPTABLES SRC=203.0.113.10 DST=10.0.0.5 PROTO=TCP DPT=5432"
+    },
+    {
+      "timestamp": "2026-04-23T10:00:18+00:00",
+      "source_type": "firewall",
+      "line": "Apr 23 10:00:18 lab kernel: IPTABLES SRC=203.0.113.10 DST=10.0.0.5 PROTO=TCP DPT=6379"
+    },
+    {
+      "timestamp": "2026-04-23T10:00:21+00:00",
+      "source_type": "firewall",
+      "line": "Apr 23 10:00:21 lab kernel: IPTABLES SRC=203.0.113.10 DST=10.0.0.5 PROTO=TCP DPT=9200"
+    },
+    {
+      "timestamp": "2026-04-23T10:01:00+00:00",
+      "source_type": "ssh",
+      "line": "Apr 23 10:01:00 target sshd[111]: Failed password for invalid user admin from 203.0.113.10 port 22 ssh2"
+    },
+    {
+      "timestamp": "2026-04-23T10:01:10+00:00",
+      "source_type": "ssh",
+      "line": "Apr 23 10:01:10 target sshd[112]: Failed password for invalid user test from 203.0.113.10 port 22 ssh2"
+    },
+    {
+      "timestamp": "2026-04-23T10:01:20+00:00",
+      "source_type": "ssh",
+      "line": "Apr 23 10:01:20 target sshd[113]: Failed password for invalid user guest from 203.0.113.10 port 22 ssh2"
+    },
+    {
+      "timestamp": "2026-04-23T10:01:30+00:00",
+      "source_type": "ssh",
+      "line": "Apr 23 10:01:30 target sshd[114]: Failed password for invalid user oracle from 203.0.113.10 port 22 ssh2"
+    },
+    {
+      "timestamp": "2026-04-23T10:01:40+00:00",
+      "source_type": "ssh",
+      "line": "Apr 23 10:01:40 target sshd[115]: Failed password for invalid user root from 203.0.113.10 port 22 ssh2"
+    },
+    {
+      "timestamp": "2026-04-23T10:02:00+00:00",
+      "source_type": "ssh",
+      "line": "Apr 23 10:02:00 target sshd[116]: Accepted password for root from 203.0.113.10 port 22 ssh2"
+    }
+  ]
+}

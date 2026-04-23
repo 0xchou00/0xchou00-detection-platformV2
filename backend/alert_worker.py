@@ -4,49 +4,63 @@ import asyncio
 import json
 import logging
 
-from redis.asyncio import Redis
-
 from app.v2.config import settings
+from app.v2.redis_clients import state_redis, stream_redis
 from app.v2.services import AlertDispatcher
+from app.v2.state import RedisStateStore
+from app.v2.streaming import StreamReliabilityManager, StreamMessage
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 LOGGER = logging.getLogger("siem-alert-worker")
 
 
-async def _ensure_group(redis_client: Redis, stream: str, group: str) -> None:
-    try:
-        await redis_client.xgroup_create(stream, group, id="0", mkstream=True)
-    except Exception as exc:
-        if "BUSYGROUP" not in str(exc):
-            raise
-
-
 async def run() -> None:
-    redis_client = Redis.from_url(settings.redis_url, decode_responses=True)
-    await _ensure_group(redis_client, settings.alert_stream, settings.alert_group)
-    dispatcher = AlertDispatcher()
+    stream_client = stream_redis()
+    state_client = state_redis()
+    reliability = StreamReliabilityManager(
+        stream_client,
+        state_client,
+        stream_name=settings.alert_stream,
+        group_name=settings.alert_group,
+        consumer_name=settings.alerter_id,
+    )
+    await reliability.ensure_group()
+    dispatcher = AlertDispatcher(state_store=RedisStateStore(state_client))
     LOGGER.info("alert worker started stream=%s group=%s id=%s", settings.alert_stream, settings.alert_group, settings.alerter_id)
-    while True:
-        records = await redis_client.xreadgroup(
-            groupname=settings.alert_group,
-            consumername=settings.alerter_id,
-            streams={settings.alert_stream: ">"},
-            count=100,
-            block=4000,
+    try:
+        while True:
+            reclaimed = await reliability.reclaim_stuck(100)
+            if reclaimed:
+                LOGGER.warning("reclaimed %s stuck alert messages", len(reclaimed))
+            new_messages = await reliability.read_new(100, 4000)
+            for message in reclaimed + new_messages:
+                await _dispatch(dispatcher, reliability, message)
+    finally:
+        await state_client.aclose()
+        await stream_client.aclose()
+
+
+async def _dispatch(
+    dispatcher: AlertDispatcher,
+    reliability: StreamReliabilityManager,
+    message: StreamMessage,
+) -> None:
+    try:
+        alert = json.loads(str(message.payload.get("alert") or "{}"))
+        await dispatcher.deliver(alert)
+        await reliability.ack(message.message_id)
+    except Exception as exc:
+        LOGGER.exception("failed dispatching alert id=%s", message.message_id)
+        outcome = await reliability.fail(
+            message_id=message.message_id,
+            payload=message.payload,
+            failure_reason="alert_delivery_error",
+            error=str(exc),
+            source_agent=message.payload.get("source_agent"),
         )
-        if not records:
-            continue
-        for _, items in records:
-            for message_id, payload in items:
-                try:
-                    alert = json.loads(payload["alert"])
-                    await dispatcher.deliver(alert)
-                    await redis_client.xack(settings.alert_stream, settings.alert_group, message_id)
-                except Exception:
-                    LOGGER.exception("failed dispatching alert id=%s", message_id)
+        LOGGER.warning("alert message failure outcome=%s id=%s", outcome, message.message_id)
 
 
 if __name__ == "__main__":
     asyncio.run(run())
-

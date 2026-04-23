@@ -34,9 +34,11 @@ class NormalizedEvent:
     destination_ip: str | None = None
     destination_port: int | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
+    parser_status: str = "parsed"
+    parser_error: dict[str, Any] = field(default_factory=dict)
 
     def to_payload(self) -> dict[str, Any]:
-        return {
+        payload = {
             "timestamp": self.timestamp.astimezone(timezone.utc).isoformat(),
             "source_type": self.source_type,
             "event_type": self.event_type,
@@ -46,19 +48,49 @@ class NormalizedEvent:
             "destination_ip": self.destination_ip,
             "destination_port": self.destination_port,
             "metadata": self.metadata,
+            "parser_status": self.parser_status,
+            "parser_error": self.parser_error,
         }
+        payload.update(self.metadata)
+        return payload
+
+
+@dataclass(slots=True)
+class ParseResult:
+    event: NormalizedEvent
+    parsed: bool
 
 
 class Normalizer:
-    def normalize(self, source_type: str, line: str) -> NormalizedEvent | None:
-        source = source_type.lower().strip()
+    def normalize(self, source_type: str, line: str) -> ParseResult:
+        source = source_type.lower().strip() or "unknown"
         if source == "ssh":
-            return self._parse_ssh(line)
-        if source in {"nginx", "apache", "web"}:
-            return self._parse_http(source, line)
-        if source in {"firewall", "network"}:
-            return self._parse_firewall(source, line)
-        return None
+            event = self._parse_ssh(line)
+        elif source in {"nginx", "apache", "web"}:
+            event = self._parse_http(source, line)
+        elif source in {"firewall", "network"}:
+            event = self._parse_firewall(source, line)
+        else:
+            event = None
+
+        if event is not None:
+            return ParseResult(event=event, parsed=True)
+
+        return ParseResult(
+            event=NormalizedEvent(
+                timestamp=datetime.now(timezone.utc),
+                source_type=source,
+                event_type="unparsed_log",
+                raw_message=line,
+                severity="info",
+                parser_status="failed",
+                parser_error={
+                    "reason": "no_parser_match",
+                    "source_type": source,
+                },
+            ),
+            parsed=False,
+        )
 
     def _parse_ssh(self, line: str) -> NormalizedEvent | None:
         failed = SSH_FAIL_RE.match(line)

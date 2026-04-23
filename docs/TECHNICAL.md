@@ -1,36 +1,34 @@
 # Technical Deep Dive
 
+This document describes the internal contracts behind the V2 hardening phase. It is intentionally implementation-focused.
+
 ## Runtime Topology
 
-Default runtime processes:
+Default processes:
 
-- `lab-target`: local attack surface for SSH, HTTP, and firewall-style connection logs.
-- `agent`: tails lab-target logs and forwards them to the API.
-- `backend-api`: FastAPI application serving ingestion, query APIs, and WebSocket fan-out.
-- `backend-worker`: stream consumer that performs normalization, detection, correlation, persistence, and live publication.
-- `alert-worker`: stream consumer that routes stored alert payloads to email and webhook sinks.
-- `redis`: backs streams, detection state, correlation state, dedupe keys, and Pub/Sub.
-- `postgres`: backs durable tables and integrity-chain records.
-- `dashboard`: browser client backed by HTTP bootstrap queries and WebSocket updates.
+- `agent`: tails files, buffers locally, signs ingest requests
+- `backend-api`: validates ingest requests, appends to Redis Streams, serves query APIs and WebSocket clients
+- `backend-worker`: consumes the ingest stream, normalizes, enriches, detects, correlates, persists
+- `alert-worker`: consumes the alert stream, sends webhook and SMTP alerts
+- `redis`: logical separation for streams, Pub/Sub, and state
+- `postgres`: durable events, alerts, audit, credentials, integrity
+- `dashboard`: HTTP bootstrap plus WebSocket updates
 
-The project uses one Redis instance for four distinct roles:
+Redis responsibilities are explicitly separated by logical database:
 
-1. Ingest queue
-2. Alert queue
-3. Detection and correlation state store
-4. Pub/Sub hub for live UI updates
+- DB 0: stream queue only
+- DB 1: Pub/Sub only
+- DB 2: detection state, correlation state, retry metadata, replay nonces, rate-limit counters
 
-This is operationally convenient and easy to inspect in a lab, but it means one Redis outage removes queueing, state, and live transport at once.
-
-The default repository path is self-contained: `./run.sh` starts every component needed to exercise the pipeline, including a lab target and an agent. The standalone agent config still exists for non-containerized deployments.
+This does not remove the single-instance failure domain. It does remove keyspace mixing and makes intent explicit.
 
 ## Internal Data Models
 
-### `NormalizedEvent`
+### Normalized event
 
-Defined in [backend/app/v2/normalizer.py](</C:/Users/omarc/Desktop/version final detection tool/0xchou00-Detection-/backend/app/v2/normalizer.py>).
+Defined in `backend/app/v2/normalizer.py`.
 
-Fields:
+Core fields:
 
 - `timestamp`
 - `source_type`
@@ -41,59 +39,53 @@ Fields:
 - `destination_ip`
 - `destination_port`
 - `metadata`
+- `parser_status`
+- `parser_error`
 
-`metadata` carries parser-specific attributes. Current parsers populate:
+Important rule:
 
-- SSH: `username`, `status`
-- HTTP: `method`, `path`, `status`, `user_agent`
-- Firewall: `protocol`, `status`
+- parsing failure does not return `None`
+- parsing failure returns a valid event with `parser_status=failed`
 
-### `events` table
+### Event record
 
-Defined in [backend/app/v2/db.py](</C:/Users/omarc/Desktop/version final detection tool/0xchou00-Detection-/backend/app/v2/db.py>).
+Defined in `backend/app/v2/db.py` as `EventRecord`.
 
-Columns:
+Important fields:
 
 - `id`
-- `timestamp`
 - `received_at`
+- `timestamp`
+- `agent_id`
+- `ingest_source_ip`
 - `source_type`
 - `event_type`
-- `source_ip`
-- `destination_ip`
-- `destination_port`
-- `severity`
+- `parser_status`
+- `parser_error`
 - `raw_message`
-- `payload` (`JSONB`)
+- `payload`
+- `enrichment`
 - `integrity_hash`
 
-`timestamp` is derived from the source log. `received_at` is assigned by the API before the line enters Redis Streams.
+Partitioning:
 
-### `Alert`
+- range partitioned by `received_at`
+- monthly partitions are created during startup
 
-Defined in [backend/app/v2/detection.py](</C:/Users/omarc/Desktop/version final detection tool/0xchou00-Detection-/backend/app/v2/detection.py>).
+Indexes:
 
-Fields:
+- source type/time
+- source IP/time
+- parser status/time
+- payload JSONB GIN
+- enrichment JSONB GIN
+- expression index on `payload->>'ingest_message_id'`
 
-- `detector`
-- `severity`
-- `title`
-- `description`
-- `source_type`
-- `source_ip`
-- `event_count`
-- `evidence`
-- `metadata`
-- `created_at`
-- `alert_id`
-- `rule_id`
-- `alert_kind`
+### Alert record
 
-`alert_kind` distinguishes plain detector alerts from correlation alerts.
+Defined as `AlertRecord`.
 
-### `alerts` table
-
-Columns:
+Important fields:
 
 - `id`
 - `created_at`
@@ -106,439 +98,423 @@ Columns:
 - `source_type`
 - `source_ip`
 - `event_count`
-- `metadata` (`JSONB`)
-- `evidence` (`JSONB`)
+- `metadata`
+- `evidence`
 - `integrity_hash`
 
-The persisted `metadata` is augmented inside the worker to include:
+Partitioning:
 
-- `related_event_ids`
-- `related_alert_ids`
+- range partitioned by `created_at`
 
-### `integrity_chain` table
+### Ingest audit record
 
-Columns:
+Defined as `IngestAuditRecord`.
 
-- `sequence`
+Purpose:
+
+- preserve security-relevant ingest failures and accepted queueing decisions
+
+Important fields:
+
 - `created_at`
-- `entity_type`
-- `entity_id`
-- `prev_hash`
-- `payload_hash`
-- `related_hashes`
-- `contract_hash`
+- `agent_id`
+- `source_ip`
+- `outcome`
+- `reason`
+- `details`
 
-The chain is append-only by convention, but not enforced by database constraints beyond row insertion semantics.
+### Agent credential record
 
-## Event Schema by Source Type
+Defined as `AgentCredentialRecord`.
 
-### SSH
+Purpose:
 
-Input pattern:
+- bind agent identity to an API key, signing secret, rate limit, and key version
 
-- failed login
-- successful login
+Important fields:
 
-Produced event types:
+- `agent_id`
+- `api_key`
+- `signing_secret`
+- `key_version`
+- `rate_limit_per_window`
+- `rotated_from`
+- `is_active`
+- `last_used_at`
+
+## Event Schema
+
+### Common event shape
+
+All stored events preserve:
+
+- normalized timestamps
+- raw log line
+- parser status
+- parser error metadata when parsing fails
+- enrichment context
+- top-level metadata copied from parser-specific fields
+
+### SSH events
+
+Event types:
 
 - `authentication_failure`
 - `authentication_success`
 
-Severity assignment:
+Metadata:
 
-- failure -> `high`
-- success -> `info`
+- `username`
+- `status`
 
-### HTTP
+### HTTP events
 
-Input pattern:
-
-- common access log style with client IP, request line, status, and user-agent
-
-Produced event type:
+Event type:
 
 - `http_request`
 
-Severity assignment:
+Metadata:
 
-- status >= 400 -> `medium`
-- otherwise -> `info`
+- `method`
+- `path`
+- `status`
+- `user_agent`
 
-### Firewall
+### Firewall events
 
-Input pattern:
-
-- syslog line containing `SRC=`, `DST=`, `PROTO=`, `DPT=`
-
-Produced event type:
+Event type:
 
 - `network_connection_attempt`
 
-Severity assignment:
+Metadata:
 
-- `medium`
+- `protocol`
+- `status`
+
+### Parse failure events
+
+Event type:
+
+- `unparsed_log`
+
+Metadata contract:
+
+- `raw_message` is always the original line
+- `parser_status=failed`
+- `parser_error.reason` is at least `no_parser_match`
+
+## Ingest Security Contract
+
+`POST /ingest` expects:
+
+- `X-Agent-Id`
+- `X-Agent-Key`
+- `X-Key-Version`
+- `X-Timestamp`
+- `X-Nonce`
+- `X-Signature`
+
+Signature material:
+
+`agent_id + "\n" + timestamp + "\n" + nonce + "\n" + key_version + "\n" + sha256(body)`
+
+Signature algorithm:
+
+- HMAC-SHA256 with the active agent signing secret
+
+Validation order:
+
+1. optional TLS requirement
+2. required header presence
+3. timestamp parse
+4. replay window check
+5. active agent credential lookup
+6. key version check
+7. signature verification
+8. nonce uniqueness through Redis `SET NX EX`
+9. per-agent rate limit through Redis `INCR`
+
+Failure outcome:
+
+- reject request
+- write `ingest_audit` record when storage is available
+
+## Worker Lifecycle
+
+### Ingest worker
+
+Startup sequence:
+
+1. connect to stream Redis, Pub/Sub Redis, and state Redis
+2. initialize database schema and partitions
+3. ensure ingest consumer group exists
+4. instantiate `WorkerPipeline`
+
+Main loop:
+
+1. inspect `XPENDING`
+2. reclaim stuck messages with `XAUTOCLAIM`
+3. read new messages with `XREADGROUP`
+4. process each message
+5. `XACK` on success
+6. increment retry state on failure
+7. dead-letter after retry exhaustion
+
+### Alert worker
+
+Startup sequence:
+
+1. connect to stream Redis and state Redis
+2. ensure alert consumer group exists
+3. instantiate `AlertDispatcher`
+
+Main loop:
+
+1. reclaim stuck alert messages
+2. read new alert messages
+3. deliver
+4. `XACK` on success
+5. increment retry state on failure
+6. dead-letter after retry exhaustion
+
+## Message Queue Behavior
+
+### Consumer groups
+
+Current groups:
+
+- ingest group: `workers`
+- alert group: `alerting`
+
+Streams are consumed with one logical owner per pending entry at a time. Messages are not removed until explicitly acknowledged.
+
+### Pending-entry handling
+
+`XPENDING` is used to inspect queue health.
+
+`XAUTOCLAIM` is used to reclaim messages whose idle time exceeds `SIEM_STREAM_CLAIM_IDLE_MS`.
+
+This means worker death does not leave messages permanently stranded in another consumer.
+
+### Retry model
+
+Retry counters are stored in state Redis:
+
+- key pattern: `siem:retry:<stream>:<message_id>`
+
+Behavior:
+
+- increment on processing failure
+- expire the counter after `SIEM_STREAM_RETRY_TTL_SECONDS`
+- dead-letter once retry count reaches `SIEM_STREAM_RETRY_LIMIT`
+
+### Dead-letter model
+
+Dead-letter messages are written to `siem:dead-letter`.
+
+Stored fields:
+
+- original stream
+- consumer group
+- original message ID
+- original payload
+- failure reason
+- retry count
+- last processing error
+- timestamp
+- source agent
+
+Dead letters are inspectable through `GET /dead-letters`.
 
 ## Detection Execution Flow
 
-Entry point: `WorkerPipeline.process()`
+Entry point:
 
-Execution order:
+- `WorkerPipeline.process()`
 
-1. Normalize raw line into `NormalizedEvent`
-2. Persist event to PostgreSQL
-3. Append event integrity record
-4. Run built-in detections
-5. Run YAML detections
-6. Persist each detector alert
-7. Append alert integrity record
-8. Run correlation for each detector alert
-9. Persist each correlation alert
-10. Append correlation alert integrity record
-11. Publish live event/alert payloads
-12. Enqueue alert for outbound delivery
+Detailed order:
+
+1. normalize raw line
+2. attach ingest metadata such as `agent_id` and `ingest_message_id`
+3. enrich with asset, identity, GeoIP, ASN, reputation, suppression
+4. store event if it has not already been stored for the same stream message ID
+5. append integrity-chain event record
+6. run built-in detections
+7. run YAML rules
+8. store detector alerts
+9. append integrity-chain alert records
+10. run correlation for each detector alert
+11. store correlation alerts
+12. append integrity-chain correlation records
+13. publish live event and alert updates
+14. append alert payloads to the alert stream
 
 Important consequence:
 
-- Event persistence happens before detection.
-- If detection fails after the event commit, the event still exists in PostgreSQL even though no alert was created.
+- malformed logs are persisted even when no detection runs
+- suppression context can block alert emission without blocking event storage
 
-## YAML Rule Compilation
+## Rule Compilation and Validation
 
-The rule compiler loads YAML from `backend/rules/default_rules.yml` and produces `CompiledRule` objects.
+Detection rules are validated through Pydantic models:
 
-Native rule properties:
+- field-level regex compilation
+- aggregation field validation
+- required metadata such as explanation and ATT&CK IDs
 
-- `rule_id`
-- `title`
-- `description`
-- `severity`
-- `source_type`
-- `event_type`
-- `matchers`
-- `group_by`
-- `window_seconds`
-- `threshold`
-- `function`
-- `distinct_field`
+Compilation output:
 
-Supported matcher operations:
+- `CompiledRule`
+- `CompiledMatcher`
 
-- `equals`
-- `contains`
-- `regex`
-
-Compilation is intentionally shallow. It does not optimize rules into a decision tree or indexed lookup table. Every rule is evaluated sequentially against each normalized event.
-
-## Sigma-like Subset
-
-The Sigma-like mode is not a full Sigma engine. Current support is limited to:
+Supported Sigma-like subset:
 
 - `sigma.logsource.product`
 - `sigma.detection.selection`
 
-The `condition` field is parsed from the YAML file but not evaluated as a general expression tree. The implementation effectively treats `selection` as the whole condition.
+Unsupported Sigma behaviors:
 
-This is enough to demonstrate translation into the internal matcher model, but it is not compatible with most real Sigma rules without preprocessing.
+- general boolean conditions
+- field modifiers
+- pipelines
 
-## Detection State Storage
+## Built-in Detection State
 
-Redis stores two classes of short-lived state.
-
-### Count windows
-
-Key pattern:
-
-- `siem:state:<namespace>:<group>:count`
-
-Stored value:
-
-- Sorted set of synthetic members scored by event timestamp
-
-Usage:
-
-- brute-force failure counts
-- YAML `count` aggregations
-
-Window maintenance:
-
-- add member
-- trim anything older than `window_seconds`
-- count members in current range
-- set key expiry to roughly three window lengths
-
-### Distinct windows
-
-Key pattern:
-
-- `siem:state:<namespace>:<group>:distinct`
-
-Stored value:
-
-- Sorted set where the member is the distinct field value and the score is the most recent timestamp
-
-Usage:
-
-- port-scan distinct destination ports
-- YAML `distinct_count` aggregations
-
-Trade-off:
-
-- Reusing the distinct value as the member means repeat observations overwrite the member timestamp rather than creating multiple entries. That is correct for distinct counts, but it also means the set captures only the most recent timestamp for each distinct value.
-
-### Dedupe keys
-
-Key pattern:
-
-- `siem:state:dedupe:<rule_id>:<group>:<bucket>`
-- `siem:corr:dedupe:<fingerprint>`
-
-Stored value:
-
-- simple string created with `SET NX EX`
-
-Usage:
-
-- suppress repeated alert emission inside a bucket or correlation window
-
-## Built-in Detection Logic
-
-### SSH brute force
-
-Namespace:
+State namespaces:
 
 - `builtin:ssh_fail`
-
-Logic:
-
-- increment count window for source IP over 120 seconds
-- fire when count >= 5
-- severity becomes `critical` when count >= 20, otherwise `high`
-
-### Port scan
-
-Namespace:
-
+- `builtin:ssh_ip_usernames`
+- `builtin:ssh_username_ips`
 - `builtin:portscan`
 
-Logic:
+Extra baseline keys:
 
-- maintain distinct destination ports for source IP over 60 seconds
-- fire when distinct count >= 8
+- `siem:auth:seen_ips:<username>`
+- `siem:auth:rare_users`
+- `siem:auth:last_login:<username>`
 
-### Success after failures
+Deduplication keys:
 
-Namespace:
+- `siem:state:builtin-dedupe:<rule_id>:<group>:<bucket>`
 
-- `builtin:ssh_fail`
+Purpose:
 
-Logic:
-
-- on successful SSH authentication, inspect prior failure count over 300 seconds without adding a new member
-- fire when recent failures >= 3
+- built-in detections should not emit on every retry or every additional event within the same bucket
 
 ## Correlation State Storage
-
-Correlation keeps recent detector alerts in Redis sorted sets.
 
 Key pattern:
 
 - `siem:corr:history:<source_ip>`
 
-Member:
+Storage type:
 
-- JSON-serialized alert summary
+- Redis sorted set of JSON summaries
 
-Score:
+TTL:
 
-- `created_at` Unix timestamp
+- bounded by `SIEM_CORRELATION_HISTORY_TTL_SECONDS`
 
-Retention:
+Dedupe:
 
-- Trim anything older than two hours
-- Expire the key after three hours
+- `siem:corr:dedupe:<fingerprint>`
 
-Rule evaluation then takes the trimmed history, bounds it again to each rule's `window_seconds`, and performs ordered sequence matching.
+Recovery behavior:
 
-Trade-offs:
+- Redis restart drops correlation memory
+- stored alerts remain durable in PostgreSQL, but no automatic replay into correlation state is implemented
 
-- Cheap to implement and inspect
-- History is duplicated in Redis and PostgreSQL
-- PostgreSQL is not used for replay or recovery
-- Sequence matching is linear and simple but limited in expressiveness
+## Enrichment Model
 
-## Worker Lifecycle
+Current enrichments:
 
-### Startup
+- GeoIP
+- ASN
+- asset role
+- service criticality
+- user identity
+- static reputation score
+- suppression and allowlist context
 
-`backend-worker`:
+Sources:
 
-1. Connect to Redis
-2. Initialize PostgreSQL schema
-3. Create ingest consumer group if absent
-4. Instantiate `WorkerPipeline`
-5. Block on `XREADGROUP`
+- local YAML files in `backend/config`
+- optional GeoIP mmdb files if present
 
-`alert-worker`:
+Suppression behavior:
 
-1. Connect to Redis
-2. Create alert consumer group if absent
-3. Instantiate `AlertDispatcher`
-4. Block on `XREADGROUP`
+- suppression prevents alert creation
+- suppression does not prevent event storage
 
-### Normal processing
+This is intentional. Analysts still need the telemetry, even if the system chooses not to alert on it.
 
-- Read a batch from the stream
-- Process one message at a time
-- Ack only after successful completion
+## Integrity Chain Behavior
 
-### Failure behavior
+Every stored entity becomes a chain record. The chain is linear and forward-linked by `prev_hash`.
 
-- Exceptions are logged
-- The message is left pending because `XACK` is not called
-- No automatic claim logic exists for orphaned pending entries
+Verification path:
 
-This means the current design provides at-least-once intent, but operational recovery of failed or abandoned pending entries is incomplete.
+1. recompute `contract_hash`
+2. compare `prev_hash`
+3. recompute entity payload hash from the database
+4. compare with stored `payload_hash`
 
-## Message Queue Behavior
+Trade-off:
 
-### Ingest stream
+- this catches post-write tampering inside the platform
+- it does not prove the source host was trustworthy
 
-Producer:
+## Retention
 
-- `POST /ingest`
+Retention job:
 
-Payload fields:
+- `backend/retention.py`
 
-- `source_type`
-- `line`
-- `received_at`
-- `agent_id`
+Current behavior:
 
-Consumer group:
+- delete events older than `SIEM_EVENT_RETENTION_DAYS`
+- delete alerts older than `SIEM_ALERT_RETENTION_DAYS`
+- delete ingest audit rows older than `SIEM_AUDIT_RETENTION_DAYS`
 
-- configured by `SIEM_INGEST_GROUP`
+Important limitation:
 
-Consumer behavior:
+- integrity-chain retention is not implemented because naive deletion breaks chain continuity
 
-- `XREADGROUP` with `>` only
-- `XACK` after successful processing
+## Failure and Recovery Summary
 
-Retry model:
+### Redis stream unavailable
 
-- implicit only
-- failures leave the entry pending
-- no dead-letter queue
-- no `XPENDING`, `XCLAIM`, or `XAUTOCLAIM`
+- ingest fails closed
+- worker processing stops
+- agent spool becomes the buffer
 
-### Alert stream
+### Redis state unavailable
 
-Producer:
+- rate limiting, replay protection, retries, detection state, and correlation state fail with Redis
+- PostgreSQL durability is unchanged
 
-- `WorkerPipeline._store_alert()`
+### PostgreSQL unavailable
 
-Payload fields:
+- workers do not acknowledge messages
+- backlog accumulates in Redis until storage returns or queue retention becomes a problem
 
-- one JSON field named `alert`
+### Poison message
 
-Consumer group:
+- retried deterministically
+- dead-lettered after `N` attempts
+- inspectable through the API
 
-- configured by `SIEM_ALERT_GROUP`
+## Operational Limits
 
-Retry model:
+Where this design breaks first:
 
-- same as ingest stream
+- long-lived high-volume event retention in PostgreSQL
+- large rule packs with many regexes
+- Redis single-instance outage affecting queueing and state together
+- state loss after Redis restart
 
-### Pub/Sub channel
+Why:
 
-Channel:
-
-- configured by `SIEM_LIVE_CHANNEL`
-
-Use:
-
-- push live event and alert notifications to WebSocket clients
-
-Delivery property:
-
-- best effort only
-- messages are dropped for disconnected subscribers
-
-## API Behavior
-
-### `POST /ingest`
-
-Behavior:
-
-- validates analyst role
-- strips empty lines
-- appends each non-empty line independently to Redis Streams
-- returns accepted count and queued count
-
-Notable detail:
-
-- it does not validate whether `source_type` is supported by the normalizer
-
-### `GET /events`, `GET /alerts`, `GET /correlations`
-
-Behavior:
-
-- query PostgreSQL directly
-- order by newest first
-- apply optional filters
-
-Notable detail:
-
-- no cursor pagination
-- no query cost guard other than `limit`
-
-### `GET /integrity/verify`
-
-Behavior:
-
-- scans up to `limit` chain records in sequence order
-- recomputes chain material and payload hashes
-
-### `WS /ws/live`
-
-Behavior:
-
-- validates viewer key from query string
-- subscribes to Redis Pub/Sub
-- sends heartbeat every 15 seconds
-
-Notable detail:
-
-- the WebSocket server does not backfill missed messages
-
-## Alert Delivery Flow
-
-Alert delivery is severity-gated:
-
-- `high`
-- `critical`
-
-For those severities, the alert worker attempts:
-
-1. Webhook delivery if the corresponding URL is configured
-2. SMTP delivery if SMTP host and recipients are configured
-
-Ordering matters because the current code sends the webhook first and email second in the same coroutine. A failure in webhook delivery prevents email delivery for that alert attempt because both are inside one `try` block at the worker level.
-
-## Integrity Verification Flow
-
-For each chain row:
-
-1. Recompute `contract_hash`
-2. Check stored `prev_hash` against the previous row
-3. Recompute current entity payload hash from PostgreSQL
-4. Compare it to stored `payload_hash`
-
-Integrity guarantees are limited to database state consistency. The system does not sign events at the source, so it cannot prove that the raw source log itself was genuine.
-
-## Practical Limits
-
-- Regex-heavy rule sets will scale linearly with rule count.
-- Redis state loss resets all sliding windows and correlation memory.
-- Pending stream entries require manual intervention or additional automation for full recovery.
-- The current schema stores complete JSON payloads in PostgreSQL but does not normalize deep fields for indexed search.
-- The dashboard bootstrap queries assume recent-history usage and will need redesign for larger event volumes.
+- PostgreSQL is doing both durable retention and recent operational query work
+- the detection engine is still interpreted, not indexed
+- Redis is still a single operational failure domain even though keyspaces are separated

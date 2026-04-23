@@ -1,80 +1,67 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1320" height="460" viewBox="0 0 1320 460">
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="360" viewBox="0 0 1400 360">
   <defs>
     <style>
-      .bg { fill: #081017; }
-      .node { fill: #13232d; stroke: #67e8f9; stroke-width: 2; rx: 14; ry: 14; }
-      .store { fill: #1f2530; stroke: #f59e0b; stroke-width: 2; rx: 14; ry: 14; }
-      .state { fill: #152631; stroke: #34d399; stroke-width: 2; rx: 14; ry: 14; }
-      .txt { fill: #ecfeff; font: 16px 'IBM Plex Sans', sans-serif; font-weight: 600; }
-      .sub { fill: #b7d7df; font: 13px 'IBM Plex Sans', sans-serif; }
-      .fine { fill: #90aab5; font: 12px 'IBM Plex Sans', sans-serif; }
-      .edge { stroke: #7dd3fc; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
+      .bg { fill: #0c1520; }
+      .box { fill: #122233; stroke: #60a5fa; stroke-width: 2; rx: 14; ry: 14; }
+      .proc { fill: #132a2d; stroke: #5eead4; stroke-width: 2; rx: 14; ry: 14; }
+      .store { fill: #2a1f1a; stroke: #f59e0b; stroke-width: 2; rx: 14; ry: 14; }
+      .title { fill: #eefcff; font: 18px 'IBM Plex Sans', sans-serif; font-weight: 600; }
+      .label { fill: #d2ebf1; font: 12px 'IBM Plex Sans', sans-serif; }
+      .line { stroke: #d2ebf1; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
     </style>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
-      <path d="M0,0 L10,5 L0,10 z" fill="#7dd3fc"/>
+      <path d="M0,0 L10,5 L0,10 z" fill="#d2ebf1"/>
     </marker>
   </defs>
 
-  <rect class="bg" width="1320" height="460"/>
+  <rect class="bg" width="1400" height="360"/>
 
-  <rect class="node" x="30" y="70" width="170" height="95"/>
-  <text class="txt" x="58" y="108">1. Log line</text>
-  <text class="sub" x="52" y="132">SSH / web / firewall text</text>
+  <rect class="box" x="30" y="110" width="150" height="110"/>
+  <text class="title" x="68" y="148">Raw Log</text>
+  <text class="label" x="48" y="176">SSH / HTTP / firewall</text>
+  <text class="label" x="48" y="196">one line at a time</text>
 
-  <rect class="node" x="240" y="70" width="180" height="95"/>
-  <text class="txt" x="264" y="108">2. Agent batch</text>
-  <text class="sub" x="258" y="132">buffer -> HTTPS POST</text>
+  <rect class="proc" x="220" y="110" width="180" height="110"/>
+  <text class="title" x="272" y="148">Ingest API</text>
+  <text class="label" x="238" y="176">auth, replay, rate limit</text>
+  <text class="label" x="238" y="196">append to stream only</text>
 
-  <rect class="node" x="460" y="70" width="190" height="95"/>
-  <text class="txt" x="494" y="108">3. API ingest</text>
-  <text class="sub" x="478" y="132">auth -> Redis XADD</text>
+  <rect class="box" x="440" y="110" width="170" height="110"/>
+  <text class="title" x="463" y="148">Redis Stream</text>
+  <text class="label" x="458" y="176">siem:ingest</text>
+  <text class="label" x="458" y="196">raw payload + agent metadata</text>
 
-  <rect class="state" x="690" y="50" width="220" height="135"/>
-  <text class="txt" x="742" y="88">4. Redis stream</text>
-  <text class="sub" x="710" y="114">raw fields:</text>
-  <text class="fine" x="710" y="138">source_type, line, received_at, agent_id</text>
-  <text class="fine" x="710" y="160">pending until worker XACK</text>
+  <rect class="proc" x="650" y="40" width="170" height="90"/>
+  <text class="title" x="684" y="76">Normalize</text>
+  <text class="label" x="668" y="102">typed event or parse failure</text>
 
-  <rect class="node" x="950" y="70" width="180" height="95"/>
-  <text class="txt" x="980" y="108">5. Worker read</text>
-  <text class="sub" x="970" y="132">XREADGROUP consumer</text>
+  <rect class="proc" x="650" y="150" width="170" height="90"/>
+  <text class="title" x="685" y="186">Enrich</text>
+  <text class="label" x="664" y="212">GeoIP, ASN, asset, identity</text>
 
-  <rect class="node" x="1160" y="70" width="130" height="95"/>
-  <text class="txt" x="1174" y="108">6. Normalize</text>
-  <text class="sub" x="1176" y="132">typed event</text>
+  <rect class="store" x="860" y="110" width="170" height="110"/>
+  <text class="title" x="909" y="148">Event Store</text>
+  <text class="label" x="878" y="176">payload + enrichment + hash</text>
+  <text class="label" x="878" y="196">parser failures kept</text>
 
-  <rect class="store" x="1040" y="235" width="190" height="115"/>
-  <text class="txt" x="1066" y="275">7. PostgreSQL</text>
-  <text class="sub" x="1058" y="300">events / alerts / chain</text>
-  <text class="fine" x="1058" y="322">authoritative history</text>
+  <rect class="proc" x="1070" y="40" width="170" height="90"/>
+  <text class="title" x="1093" y="76">Detection</text>
+  <text class="label" x="1088" y="102">built-ins + YAML rules</text>
 
-  <rect class="state" x="690" y="245" width="250" height="120"/>
-  <text class="txt" x="726" y="285">8. Redis state</text>
-  <text class="sub" x="710" y="310">count windows, distinct windows,</text>
-  <text class="sub" x="710" y="330">correlation history, dedupe keys</text>
+  <rect class="proc" x="1070" y="150" width="170" height="90"/>
+  <text class="title" x="1086" y="186">Correlation</text>
+  <text class="label" x="1085" y="212">ordered alert sequences</text>
 
-  <rect class="node" x="430" y="245" width="220" height="120"/>
-  <text class="txt" x="454" y="285">9. Detection + correlation</text>
-  <text class="sub" x="448" y="310">built-ins -> YAML rules -></text>
-  <text class="sub" x="448" y="330">sequence rules</text>
+  <rect class="store" x="1280" y="110" width="90" height="110"/>
+  <text class="title" x="1298" y="148">Alerts</text>
+  <text class="label" x="1290" y="176">DB + alert stream</text>
 
-  <rect class="node" x="180" y="245" width="210" height="120"/>
-  <text class="txt" x="214" y="285">10. Live publication</text>
-  <text class="sub" x="198" y="310">Redis Pub/Sub + alert stream</text>
-  <text class="fine" x="198" y="332">Pub/Sub is not durable</text>
-
-  <rect class="node" x="30" y="245" width="110" height="120"/>
-  <text class="txt" x="48" y="286">11. UI</text>
-  <text class="sub" x="40" y="310">HTTP + WS</text>
-
-  <line class="edge" x1="200" y1="117" x2="240" y2="117"/>
-  <line class="edge" x1="420" y1="117" x2="460" y2="117"/>
-  <line class="edge" x1="650" y1="117" x2="690" y2="117"/>
-  <line class="edge" x1="910" y1="117" x2="950" y2="117"/>
-  <line class="edge" x1="1130" y1="117" x2="1160" y2="117"/>
-  <line class="edge" x1="1225" y1="165" x2="1140" y2="235"/>
-  <line class="edge" x1="1160" y1="165" x2="940" y2="285"/>
-  <line class="edge" x1="1040" y1="165" x2="650" y2="285"/>
-  <line class="edge" x1="430" y1="305" x2="390" y2="305"/>
-  <line class="edge" x1="180" y1="305" x2="140" y2="305"/>
+  <line class="line" x1="180" y1="165" x2="220" y2="165"/>
+  <line class="line" x1="400" y1="165" x2="440" y2="165"/>
+  <line class="line" x1="610" y1="165" x2="650" y2="85"/>
+  <line class="line" x1="735" y1="130" x2="735" y2="150"/>
+  <line class="line" x1="820" y1="195" x2="860" y2="165"/>
+  <line class="line" x1="1030" y1="165" x2="1070" y2="85"/>
+  <line class="line" x1="1155" y1="130" x2="1155" y2="150"/>
+  <line class="line" x1="1240" y1="195" x2="1280" y2="165"/>
 </svg>

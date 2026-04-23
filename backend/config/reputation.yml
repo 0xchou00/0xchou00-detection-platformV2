@@ -1,0 +1,6 @@
+reputation:
+  suspicious_ips:
+    "127.0.0.1":
+      score: 20
+      labels:
+        - lab-traffic

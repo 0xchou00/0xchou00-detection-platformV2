@@ -1,0 +1,7 @@
+identities:
+  - username: root
+    display_name: Lab Administrator
+    identity_type: privileged
+  - username: www-data
+    display_name: Web Service Account
+    identity_type: service

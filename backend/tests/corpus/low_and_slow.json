@@ -1,0 +1,19 @@
+{
+  "entries": [
+    {
+      "timestamp": "2026-04-23T08:00:00+00:00",
+      "source_type": "ssh",
+      "line": "Apr 23 08:00:00 target sshd[311]: Failed password for admin from 203.0.113.55 port 22 ssh2"
+    },
+    {
+      "timestamp": "2026-04-23T08:20:00+00:00",
+      "source_type": "ssh",
+      "line": "Apr 23 08:20:00 target sshd[312]: Failed password for admin from 203.0.113.55 port 22 ssh2"
+    },
+    {
+      "timestamp": "2026-04-23T08:40:00+00:00",
+      "source_type": "ssh",
+      "line": "Apr 23 08:40:00 target sshd[313]: Failed password for admin from 203.0.113.55 port 22 ssh2"
+    }
+  ]
+}

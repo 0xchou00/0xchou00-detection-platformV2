@@ -166,8 +166,27 @@ export default function App() {
           <strong>{health?.ingest_stream_backlog ?? "-"}</strong>
         </article>
         <article className="metric card">
+          <span>Failed Events</span>
+          <strong>{health?.failed_events ?? "-"}</strong>
+        </article>
+      </section>
+
+      <section className="grid4">
+        <article className="metric card">
           <span>Correlations</span>
           <strong>{filteredCorrelations.length}</strong>
+        </article>
+        <article className="metric card">
+          <span>Dead Letters</span>
+          <strong>{health?.dead_letter_count ?? "-"}</strong>
+        </article>
+        <article className="metric card">
+          <span>Rejected Ingest</span>
+          <strong>{health?.ingest_audit_rejections ?? "-"}</strong>
+        </article>
+        <article className="metric card">
+          <span>Pending</span>
+          <strong>{health?.ingest_pending?.pending ?? "-"}</strong>
         </article>
       </section>
 
@@ -246,6 +265,7 @@ export default function App() {
               <div>
                 <strong>{item.kind === "alert" ? item.item.title : item.item.event_type}</strong>
                 <p>{item.kind === "alert" ? item.item.description : item.item.raw_message}</p>
+                {item.kind === "event" ? <small>parser={item.item.parser_status || "parsed"}</small> : null}
                 <small>{new Date(item.ts).toLocaleString()}</small>
               </div>
             </div>
@@ -257,4 +277,3 @@ export default function App() {
     </div>
   );
 }
-

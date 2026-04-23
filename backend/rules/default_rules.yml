@@ -3,6 +3,9 @@ rules:
     title: Invalid SSH user burst
     description: Repeated SSH failures against invalid usernames from the same source.
     severity: high
+    explanation: Invalid usernames are often used during reconnaissance before targeted guessing.
+    detection_logic: Match SSH authentication failures whose raw message contains "invalid user" and count them per source IP over 120 seconds.
+    mitre_attack: ["T1110.001"]
     source_type: ssh
     event_type: authentication_failure
     match:
@@ -16,13 +19,16 @@ rules:
 
   - id: web_sensitive_probe
     title: Sensitive HTTP path probing
-    description: Sensitive paths hit multiple times from the same source within 2 minutes.
+    description: Sensitive administrative or secret paths hit repeatedly from one source.
     severity: high
+    explanation: Repeated requests to secrets, administrative panels, or source control artifacts indicate probing.
+    detection_logic: Match HTTP requests whose path targets known sensitive resources and count them per source IP over 2 minutes.
+    mitre_attack: ["T1595", "T1190"]
     source_type: nginx
     event_type: http_request
     match:
       path:
-        regex: "^(/\\.env|/phpmyadmin|/wp-login\\.php|/admin|/\\.git/config)$"
+        regex: "^(/\\.env|/phpmyadmin|/wp-login\\.php|/admin|/\\.git/config|/server-status)$"
     aggregation:
       group_by: source_ip
       window_seconds: 120
@@ -33,6 +39,9 @@ rules:
     title: Multi-port network probe
     description: Distinct destination port probing in a tight window.
     severity: high
+    explanation: Distinct ports touched by one source in a short interval indicate service discovery.
+    detection_logic: Count distinct destination ports per source IP over 60 seconds for firewall connection attempts.
+    mitre_attack: ["T1046"]
     source_type: firewall
     event_type: network_connection_attempt
     match:
@@ -45,10 +54,120 @@ rules:
       function: distinct_count
       field: destination_port
 
-  - id: sigma_ssh_success_after_failures
-    title: Sigma style SSH success after failures
-    description: Sigma-like subset rule that tracks successful login after suspicious activity.
+  - id: web_suspicious_user_agent
+    title: Suspicious web user agent
+    description: Known automation and offensive user agents were observed.
+    severity: medium
+    explanation: Reconnaissance and exploitation tooling frequently uses identifiable user agent strings.
+    detection_logic: Match HTTP requests whose user_agent contains curl, wget, sqlmap, nikto, gobuster, or python-requests.
+    mitre_attack: ["T1595", "T1190"]
+    source_type: nginx
+    event_type: http_request
+    match:
+      user_agent:
+        regex: "(curl|wget|sqlmap|nikto|gobuster|python-requests|masscan)"
+    aggregation:
+      group_by: source_ip
+      window_seconds: 300
+      threshold: 3
+      function: count
+
+  - id: web_path_traversal_attempt
+    title: Path traversal attempt
+    description: HTTP requests contain traversal sequences targeting filesystem paths.
+    severity: high
+    explanation: Traversal patterns are commonly used to read files outside the web root.
+    detection_logic: Match HTTP request paths containing ../, %2e%2e%2f, or encoded traversal variants and count them over 5 minutes.
+    mitre_attack: ["T1190", "T1006"]
+    source_type: nginx
+    event_type: http_request
+    match:
+      path:
+        regex: "(\\.\\./|%2e%2e%2f|%2e%2e/|\\.\\.%2f)"
+    aggregation:
+      group_by: source_ip
+      window_seconds: 300
+      threshold: 2
+      function: count
+
+  - id: web_command_injection_pattern
+    title: Command injection pattern
+    description: HTTP requests contain shell metacharacters or command execution markers.
+    severity: high
+    explanation: Shell metacharacters in URL paths often indicate command injection attempts or exploit validation.
+    detection_logic: Match request paths containing command separators such as ;, ||, &&, $(...), backticks, or /bin/sh and count them per source IP.
+    mitre_attack: ["T1190", "T1059"]
+    source_type: nginx
+    event_type: http_request
+    match:
+      path:
+        regex: "(;|\\|\\||&&|\\$\\(|`|/bin/sh|/bin/bash|cmd=)"
+    aggregation:
+      group_by: source_ip
+      window_seconds: 300
+      threshold: 2
+      function: count
+
+  - id: web_shell_indicator
+    title: Web shell indicator
+    description: HTTP requests targeted common web shell filenames or execution entry points.
     severity: critical
+    explanation: Common web shell filenames and parameters are high-signal indicators of exploitation follow-up.
+    detection_logic: Match HTTP paths referencing common shell names such as cmd.php, shell.php, c99.php, or upload endpoints used to stage shells.
+    mitre_attack: ["T1505.003", "T1190"]
+    source_type: nginx
+    event_type: http_request
+    match:
+      path:
+        regex: "(cmd\\.php|shell\\.php|c99\\.php|r57\\.php|upload\\.php|filemanager)"
+    aggregation:
+      group_by: source_ip
+      window_seconds: 600
+      threshold: 1
+      function: count
+
+  - id: web_authz_denied_spike
+    title: HTTP 401/403 spike
+    description: Repeated authorization failures were observed from one source.
+    severity: medium
+    explanation: A burst of denied requests can indicate forced browsing, auth brute force, or probing.
+    detection_logic: Match HTTP status 401 or 403 and count events per source IP over 5 minutes.
+    mitre_attack: ["T1110", "T1190"]
+    source_type: nginx
+    event_type: http_request
+    match:
+      status:
+        regex: "^(401|403)$"
+    aggregation:
+      group_by: source_ip
+      window_seconds: 300
+      threshold: 10
+      function: count
+
+  - id: web_server_error_burst
+    title: HTTP 500 burst
+    description: Repeated server errors were observed from one source in a short interval.
+    severity: high
+    explanation: A burst of 5xx responses from one source can indicate exploit attempts hitting unstable code paths.
+    detection_logic: Match HTTP status 500 and count events per source IP over 2 minutes.
+    mitre_attack: ["T1190"]
+    source_type: nginx
+    event_type: http_request
+    match:
+      status: 500
+    aggregation:
+      group_by: source_ip
+      window_seconds: 120
+      threshold: 5
+      function: count
+
+  - id: sigma_ssh_success_after_failures
+    title: Sigma style SSH success
+    description: Sigma-like subset rule that demonstrates compatibility with logsource plus selection matching.
+    severity: critical
+    explanation: This rule exists to exercise the Sigma-like subset compiler on successful SSH authentication events.
+    detection_logic: Match SSH authentication_success events using the sigma.logsource and sigma.detection.selection fields.
+    mitre_attack: ["T1078"]
     sigma:
       logsource:
         product: ssh

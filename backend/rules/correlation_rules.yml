@@ -1,8 +1,11 @@
 rules:
   - id: scan_to_bruteforce_to_success
     title: Attack chain scan -> brute force -> success
-    description: Source performed multi-port scan, then SSH brute force, then obtained SSH success.
+    description: Source performed service discovery, then SSH brute force, then obtained SSH access.
     severity: critical
+    explanation: Reconnaissance followed by password guessing and then a successful login is a coherent compromise sequence.
+    detection_logic: Correlate port_scan, brute_force, and session_state alerts for the same source IP within 15 minutes.
+    mitre_attack: ["T1046", "T1110.001", "T1078"]
     window_seconds: 900
     group_by: source_ip
     sequence:
@@ -11,9 +14,12 @@ rules:
       - detector: session_state
 
   - id: web_probe_to_sensitive_rule
-    title: Web probing chain escalated
-    description: Repeated sensitive probing patterns matched by YAML rule and then escalated by correlation.
+    title: Repeated web probing chain
+    description: Multiple probing detections for one source indicate active enumeration against the target.
     severity: high
+    explanation: Multiple sensitive-path alerts from the same source in a short period indicate sustained reconnaissance.
+    detection_logic: Correlate repeated yaml_rules.web_sensitive_probe alerts for the same source IP within 10 minutes.
+    mitre_attack: ["T1595", "T1190"]
     window_seconds: 600
     group_by: source_ip
     sequence:
@@ -21,3 +27,18 @@ rules:
         rule_id: web_sensitive_probe
       - detector: yaml_rules
         rule_id: web_sensitive_probe
+
+  - id: suspicious_ua_to_command_injection
+    title: Suspicious user agent followed by command injection pattern
+    description: Tooling was identified before the request sequence escalated into likely command execution attempts.
+    severity: high
+    explanation: Offensive tooling followed by shell metacharacters in paths is stronger evidence than either event alone.
+    detection_logic: Correlate yaml_rules.web_suspicious_user_agent followed by yaml_rules.web_command_injection_pattern within 10 minutes.
+    mitre_attack: ["T1595", "T1190", "T1059"]
+    window_seconds: 600
+    group_by: source_ip
+    sequence:
+      - detector: yaml_rules
+        rule_id: web_suspicious_user_agent
+      - detector: yaml_rules
+        rule_id: web_command_injection_pattern

@@ -102,6 +102,8 @@ services:
     depends_on:
       - backend-api
       - lab-target
+    env_file:
+      - .env
     command: ["python", "/app/agent/agent.py", "--config", "/app/agent/config.docker.yaml"]
     volumes:
       - lab_logs:/logs:ro
@@ -117,7 +119,7 @@ services:
       - ./dashboard:/app/dashboard
     environment:
       VITE_TOOL_API_BASE: http://localhost:8000
-      VITE_TOOL_API_KEY: siem-viewer-dev-key
+      VITE_TOOL_API_KEY: ${SIEM_VIEWER_API_KEY:-siem-viewer-dev-key}
       VITE_TOOL_WS_BASE: ws://localhost:8000/ws/live
     ports:
       - "5173:5173"

@@ -1,0 +1,19 @@
+{
+  "entries": [
+    {
+      "timestamp": "2026-04-23T12:00:00+00:00",
+      "source_type": "ssh",
+      "line": "Apr 23 12:00:00 target sshd[211]: Failed password for root from 198.51.100.31 port 22 ssh2"
+    },
+    {
+      "timestamp": "2026-04-23T12:04:00+00:00",
+      "source_type": "ssh",
+      "line": "Apr 23 12:04:00 target sshd[212]: Failed password for root from 198.51.100.32 port 22 ssh2"
+    },
+    {
+      "timestamp": "2026-04-23T12:08:00+00:00",
+      "source_type": "ssh",
+      "line": "Apr 23 12:08:00 target sshd[213]: Failed password for root from 198.51.100.33 port 22 ssh2"
+    }
+  ]
+}

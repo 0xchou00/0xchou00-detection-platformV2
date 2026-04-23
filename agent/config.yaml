@@ -1,6 +1,8 @@
 api:
   url: "${SIEM_AGENT_API_URL:-http://127.0.0.1:8000/ingest}"
-  api_key: "${SIEM_ANALYST_API_KEY:-siem-analyst-dev-key}"
+  api_key: "${SIEM_AGENT_API_KEY:-siem-lab-agent-key}"
+  signing_secret: "${SIEM_AGENT_SIGNING_SECRET:-siem-lab-agent-secret}"
+  key_version: 1
   verify_tls: false
   timeout_seconds: 8
 
@@ -19,7 +21,7 @@ tail:
   poll_interval_seconds: 0.5
   state_file: "./state.json"
 
-agent_id: "${SIEM_AGENT_ID:-sensor-1}"
+agent_id: "${SIEM_AGENT_ID:-lab-agent}"
 
 sources:
   - source_type: "ssh"

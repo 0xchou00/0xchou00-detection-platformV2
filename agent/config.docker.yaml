@@ -1,6 +1,8 @@
 api:
   url: "${SIEM_AGENT_API_URL:-http://backend-api:8000/ingest}"
-  api_key: "${SIEM_ANALYST_API_KEY:-siem-analyst-dev-key}"
+  api_key: "${SIEM_AGENT_API_KEY:-siem-lab-agent-key}"
+  signing_secret: "${SIEM_AGENT_SIGNING_SECRET:-siem-lab-agent-secret}"
+  key_version: 1
   verify_tls: false
   timeout_seconds: 8
 

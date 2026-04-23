@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
+import hmac
 import json
 import os
 import re
+import secrets
 import time
 from collections import defaultdict
 from dataclasses import dataclass
@@ -28,6 +31,8 @@ class SourceConfig:
 class AgentConfig:
     api_url: str
     api_key: str
+    signing_secret: str
+    key_version: int
     verify_tls: bool
     timeout_seconds: float
     max_lines_per_batch: int
@@ -172,10 +177,30 @@ class IngestionAgent:
         if not lines:
             return True
         try:
+            payload = {"source_type": source_type, "lines": lines, "agent_id": self.config.agent_id}
+            body = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+            timestamp = int(time.time())
+            nonce = secrets.token_urlsafe(16)
+            signature = _build_signature(
+                secret=self.config.signing_secret,
+                body=body,
+                agent_id=self.config.agent_id,
+                nonce=nonce,
+                timestamp=timestamp,
+                key_version=self.config.key_version,
+            )
             response = await client.post(
                 self.config.api_url,
-                headers={"X-API-Key": self.config.api_key, "Content-Type": "application/json"},
-                json={"source_type": source_type, "lines": lines, "agent_id": self.config.agent_id},
+                headers={
+                    "X-Agent-Id": self.config.agent_id,
+                    "X-Agent-Key": self.config.api_key,
+                    "X-Key-Version": str(self.config.key_version),
+                    "X-Timestamp": str(timestamp),
+                    "X-Nonce": nonce,
+                    "X-Signature": signature,
+                    "Content-Type": "application/json",
+                },
+                content=body,
             )
             response.raise_for_status()
             return True
@@ -256,6 +281,8 @@ def load_config(path: Path) -> AgentConfig:
     return AgentConfig(
         api_url=str(api["url"]),
         api_key=str(api["api_key"]),
+        signing_secret=str(api.get("signing_secret", "")),
+        key_version=int(api.get("key_version", 1)),
         verify_tls=bool(api.get("verify_tls", False)),
         timeout_seconds=float(api.get("timeout_seconds", 8)),
         max_lines_per_batch=int(buffer_cfg.get("max_lines_per_batch", 200)),
@@ -270,6 +297,20 @@ def load_config(path: Path) -> AgentConfig:
         agent_id=str(payload.get("agent_id", "sensor-1")),
         sources=sources,
     )
+
+
+def _build_signature(
+    *,
+    secret: str,
+    body: bytes,
+    agent_id: str,
+    nonce: str,
+    timestamp: int,
+    key_version: int,
+) -> str:
+    body_hash = hashlib.sha256(body).hexdigest()
+    material = "\n".join([agent_id, str(timestamp), nonce, str(key_version), body_hash])
+    return hmac.new(secret.encode("utf-8"), material.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
 def main() -> None:
