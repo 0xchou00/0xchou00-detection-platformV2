@@ -1,26 +1,23 @@
 rules:
-  - id: ssh_bruteforce_plus_portscan
-    conditions:
-      time_window_seconds: 300
-      same_source_ip: true
-      alerts:
-        - detector: brute_force
-        - detector: port_scan
-    output:
-      title: SSH brute force followed by port scan
-      description: The same source triggered SSH brute-force activity and network port scanning inside five minutes.
-      severity: critical
+  - id: scan_to_bruteforce_to_success
+    title: Attack chain scan -> brute force -> success
+    description: Source performed multi-port scan, then SSH brute force, then obtained SSH success.
+    severity: critical
+    window_seconds: 900
+    group_by: source_ip
+    sequence:
+      - detector: port_scan
+      - detector: brute_force
+      - detector: session_state
 
-  - id: traffic_spike_plus_sensitive_path
-    conditions:
-      time_window_seconds: 300
-      same_source_ip: true
-      alerts:
-        - detector: anomaly_frequency
-        - detector: suspicious_ip
-          metadata:
-            reason: sensitive_path
-    output:
-      title: Traffic spike paired with sensitive path access
-      description: A traffic anomaly aligned with access to a sensitive web path from the same source IP.
-      severity: high
+  - id: web_probe_to_sensitive_rule
+    title: Web probing chain escalated
+    description: Repeated sensitive probing patterns matched by YAML rule and then escalated by correlation.
+    severity: high
+    window_seconds: 600
+    group_by: source_ip
+    sequence:
+      - detector: yaml_rules
+        rule_id: web_sensitive_probe
+      - detector: yaml_rules
+        rule_id: web_sensitive_probe

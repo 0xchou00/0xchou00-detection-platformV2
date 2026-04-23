@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1320" height="380" viewBox="0 0 1320 380">
+  <defs>
+    <style>
+      .bg { fill: #071218; }
+      .box { fill: #11222c; stroke: #67e8f9; stroke-width: 2; rx: 14; ry: 14; }
+      .state { fill: #172734; stroke: #34d399; stroke-width: 2; rx: 14; ry: 14; }
+      .out { fill: #1f2430; stroke: #f59e0b; stroke-width: 2; rx: 14; ry: 14; }
+      .title { fill: #ecfeff; font: 16px 'IBM Plex Sans', sans-serif; font-weight: 600; }
+      .text { fill: #bfdde6; font: 13px 'IBM Plex Sans', sans-serif; }
+      .edge { stroke: #8ce7df; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8ce7df"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" width="1320" height="380"/>
+
+  <rect class="box" x="20" y="120" width="140" height="100"/>
+  <text class="title" x="50" y="160">Normalized</text>
+  <text class="title" x="58" y="182">event</text>
+  <text class="text" x="40" y="205">flattened payload</text>
+
+  <rect class="box" x="210" y="40" width="200" height="100"/>
+  <text class="title" x="238" y="80">Built-in detectors</text>
+  <text class="text" x="228" y="106">brute_force</text>
+  <text class="text" x="228" y="126">port_scan</text>
+
+  <rect class="box" x="210" y="220" width="200" height="100"/>
+  <text class="title" x="236" y="260">YAML compiler</text>
+  <text class="text" x="226" y="286">equals / contains / regex</text>
+  <text class="text" x="226" y="306">native + Sigma subset</text>
+
+  <rect class="state" x="460" y="40" width="220" height="100"/>
+  <text class="title" x="490" y="80">Redis rule state</text>
+  <text class="text" x="480" y="106">count windows</text>
+  <text class="text" x="480" y="126">distinct windows + dedupe</text>
+
+  <rect class="box" x="460" y="220" width="220" height="100"/>
+  <text class="title" x="494" y="260">Rule execution</text>
+  <text class="text" x="480" y="286">threshold comparison</text>
+  <text class="text" x="480" y="306">emit detector alerts</text>
+
+  <rect class="state" x="730" y="40" width="220" height="100"/>
+  <text class="title" x="748" y="80">Correlation state</text>
+  <text class="text" x="750" y="106">history per source_ip</text>
+  <text class="text" x="750" y="126">sequence dedupe keys</text>
+
+  <rect class="box" x="730" y="220" width="220" height="100"/>
+  <text class="title" x="744" y="260">Correlation engine</text>
+  <text class="text" x="748" y="286">ordered stage matching</text>
+  <text class="text" x="748" y="306">emit chain alerts</text>
+
+  <rect class="out" x="1000" y="120" width="280" height="100"/>
+  <text class="title" x="1030" y="160">Outputs</text>
+  <text class="text" x="1020" y="186">PostgreSQL alerts + integrity chain</text>
+  <text class="text" x="1020" y="206">Pub/Sub live feed + alert stream</text>
+
+  <line class="edge" x1="160" y1="170" x2="210" y2="90"/>
+  <line class="edge" x1="160" y1="170" x2="210" y2="270"/>
+  <line class="edge" x1="410" y1="90" x2="460" y2="90"/>
+  <line class="edge" x1="410" y1="270" x2="460" y2="270"/>
+  <line class="edge" x1="680" y1="90" x2="730" y2="90"/>
+  <line class="edge" x1="680" y1="270" x2="730" y2="270"/>
+  <line class="edge" x1="950" y1="90" x2="1000" y2="150"/>
+  <line class="edge" x1="950" y1="270" x2="1000" y2="190"/>
+</svg>

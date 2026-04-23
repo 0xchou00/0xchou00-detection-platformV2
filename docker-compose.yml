@@ -1,0 +1,129 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: siem-postgres
+    environment:
+      POSTGRES_USER: siem
+      POSTGRES_PASSWORD: siem
+      POSTGRES_DB: siem
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U siem -d siem"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    container_name: siem-redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "10000"]
+    volumes:
+      - redis_data:/data
+
+  lab-target:
+    build:
+      context: .
+      dockerfile: lab/target/Dockerfile
+    container_name: siem-lab-target
+    environment:
+      LAB_TARGET_PASSWORD: ${LAB_TARGET_PASSWORD:-labpass123}
+      LAB_FIREWALL_PORTS: ${LAB_FIREWALL_PORTS:-2201,2202,2203,2204,2205,2206,2207,2208}
+    ports:
+      - "${LAB_SSH_PORT:-2222}:22"
+      - "${LAB_HTTP_PORT:-8081}:80"
+      - "${LAB_FW_PORT_1:-2201}:2201"
+      - "${LAB_FW_PORT_2:-2202}:2202"
+      - "${LAB_FW_PORT_3:-2203}:2203"
+      - "${LAB_FW_PORT_4:-2204}:2204"
+      - "${LAB_FW_PORT_5:-2205}:2205"
+      - "${LAB_FW_PORT_6:-2206}:2206"
+      - "${LAB_FW_PORT_7:-2207}:2207"
+      - "${LAB_FW_PORT_8:-2208}:2208"
+    volumes:
+      - lab_logs:/var/log
+
+  backend-api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: siem-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+    working_dir: /app/backend
+
+  backend-worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: siem-worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    env_file:
+      - .env
+    command: ["python", "worker.py"]
+    working_dir: /app/backend
+
+  alert-worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: siem-alert-worker
+    depends_on:
+      redis:
+        condition: service_started
+    env_file:
+      - .env
+    command: ["python", "alert_worker.py"]
+    working_dir: /app/backend
+
+  agent:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: siem-agent
+    depends_on:
+      - backend-api
+      - lab-target
+    command: ["python", "/app/agent/agent.py", "--config", "/app/agent/config.docker.yaml"]
+    volumes:
+      - lab_logs:/logs:ro
+    working_dir: /app
+
+  dashboard:
+    image: node:20
+    container_name: siem-dashboard
+    depends_on:
+      - backend-api
+    working_dir: /app/dashboard
+    volumes:
+      - ./dashboard:/app/dashboard
+    environment:
+      VITE_TOOL_API_BASE: http://localhost:8000
+      VITE_TOOL_API_KEY: siem-viewer-dev-key
+      VITE_TOOL_WS_BASE: ws://localhost:8000/ws/live
+    ports:
+      - "5173:5173"
+    command: ["sh", "-c", "npm install && npm run dev -- --host 0.0.0.0 --port 5173"]
+
+volumes:
+  postgres_data:
+  redis_data:
+  lab_logs:

@@ -2,10 +2,11 @@
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BACKEND_DIR="$PROJECT_ROOT/backend"
 DASHBOARD_DIR="$PROJECT_ROOT/dashboard"
 VENV_DIR="$PROJECT_ROOT/.venv"
 ENV_FILE="$PROJECT_ROOT/.env"
+ENV_EXAMPLE="$PROJECT_ROOT/.env.example"
+LAB_DIR="$PROJECT_ROOT/scripts/lab"
 
 log() { printf '[setup] %s\n' "$*"; }
 err() { printf '[setup][error] %s\n' "$*" >&2; }
@@ -28,9 +29,14 @@ log "Installing system dependencies"
 $SUDO apt-get install -y --no-install-recommends \
   ca-certificates \
   curl \
+  docker.io \
+  docker-compose-plugin \
   git \
+  hydra \
   nodejs \
+  nmap \
   npm \
+  openssh-client \
   python3 \
   python3-pip \
   python3-venv
@@ -45,34 +51,29 @@ command -v npm >/dev/null 2>&1 || {
   exit 1
 }
 
+if command -v systemctl >/dev/null 2>&1; then
+  log "Ensuring Docker service is running"
+  $SUDO systemctl enable --now docker
+fi
+
 log "Creating or refreshing virtual environment"
 python3 -m venv "$VENV_DIR"
 
 log "Installing Python dependencies"
 "$VENV_DIR/bin/python" -m pip install --upgrade pip
-"$VENV_DIR/bin/pip" install -r "$PROJECT_ROOT/requirements.txt"
+"$VENV_DIR/bin/pip" install --upgrade -r "$PROJECT_ROOT/requirements.txt"
 
 log "Installing dashboard Node dependencies"
 cd "$DASHBOARD_DIR"
 npm install
 
-log "Preparing runtime directories"
-mkdir -p "$BACKEND_DIR/data"
-mkdir -p "$PROJECT_ROOT/logs"
+mkdir -p "$PROJECT_ROOT/logs" "$LAB_DIR"
 
 if [[ ! -f "$ENV_FILE" ]]; then
-  log "Creating default .env file"
-  cat >"$ENV_FILE" <<EOF
-SIEM_DB_PATH=$BACKEND_DIR/data/0xchou00-tool.db
-SIEM_ADMIN_API_KEY=siem-admin-dev-key
-SIEM_ANALYST_API_KEY=siem-analyst-dev-key
-SIEM_VIEWER_API_KEY=siem-viewer-dev-key
-SIEM_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173
-SIEM_GEOIP_DB_PATH=$BACKEND_DIR/data/GeoLite2-City.mmdb
-ABUSEIPDB_API_KEY=
-EOF
+  log "Creating .env from .env.example"
+  cp "$ENV_EXAMPLE" "$ENV_FILE"
 else
   log "Keeping existing .env file"
 fi
 
-log "Linux setup completed successfully"
+log "Setup complete. Next: ./run.sh"

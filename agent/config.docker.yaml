@@ -1,5 +1,5 @@
 api:
-  url: "${SIEM_AGENT_API_URL:-http://127.0.0.1:8000/ingest}"
+  url: "${SIEM_AGENT_API_URL:-http://backend-api:8000/ingest}"
   api_key: "${SIEM_ANALYST_API_KEY:-siem-analyst-dev-key}"
   verify_tls: false
   timeout_seconds: 8
@@ -8,7 +8,7 @@ buffer:
   max_lines_per_batch: 200
   flush_interval_seconds: 2
   max_spool_items: 50000
-  spool_file: "./spool.ndjson"
+  spool_file: "/tmp/agent-spool.ndjson"
 
 retry:
   base_seconds: 1
@@ -17,17 +17,17 @@ retry:
 
 tail:
   poll_interval_seconds: 0.5
-  state_file: "./state.json"
+  state_file: "/tmp/agent-state.json"
 
-agent_id: "${SIEM_AGENT_ID:-sensor-1}"
+agent_id: "${SIEM_AGENT_ID:-lab-agent}"
 
 sources:
   - source_type: "ssh"
-    path: "/var/log/auth.log"
+    path: "/logs/auth.log"
     start_at_end: true
   - source_type: "nginx"
-    path: "/var/log/nginx/access.log"
+    path: "/logs/nginx/access.log"
     start_at_end: true
   - source_type: "firewall"
-    path: "/var/log/firewall.log"
+    path: "/logs/firewall.log"
     start_at_end: true

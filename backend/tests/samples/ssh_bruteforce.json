@@ -1,0 +1,11 @@
+{
+  "lines": [
+    "Apr 23 10:00:01 target sshd[1001]: Failed password for invalid user admin from 10.10.10.50 port 58122 ssh2",
+    "Apr 23 10:00:03 target sshd[1002]: Failed password for invalid user root from 10.10.10.50 port 58124 ssh2",
+    "Apr 23 10:00:05 target sshd[1003]: Failed password for invalid user test from 10.10.10.50 port 58125 ssh2",
+    "Apr 23 10:00:07 target sshd[1004]: Failed password for invalid user git from 10.10.10.50 port 58126 ssh2",
+    "Apr 23 10:00:09 target sshd[1005]: Failed password for invalid user ubuntu from 10.10.10.50 port 58127 ssh2",
+    "Apr 23 10:00:12 target sshd[1006]: Accepted password for root from 10.10.10.50 port 58130 ssh2"
+  ]
+}
+

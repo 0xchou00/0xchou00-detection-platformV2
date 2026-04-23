@@ -11,6 +11,7 @@ __pycache__/
 logs/
 backend/data/
 agent/state.json
+agent/spool.ndjson
 node_modules/
 dashboard/node_modules/
 dist/

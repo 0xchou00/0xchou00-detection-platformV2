@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="520" viewBox="0 0 1280 520">
+  <defs>
+    <style>
+      .bg { fill: #07141b; }
+      .box { fill: #10212b; stroke: #49d2c8; stroke-width: 2; rx: 14; ry: 14; }
+      .redis { fill: #16232f; stroke: #7dd3fc; stroke-width: 2; rx: 14; ry: 14; }
+      .db { fill: #1c2430; stroke: #f59e0b; stroke-width: 2; rx: 14; ry: 14; }
+      .ui { fill: #101d28; stroke: #c084fc; stroke-width: 2; rx: 14; ry: 14; }
+      .title { fill: #ecfeff; font: 18px 'IBM Plex Sans', sans-serif; font-weight: 600; }
+      .label { fill: #b7d7df; font: 13px 'IBM Plex Sans', sans-serif; }
+      .note { fill: #94aeb8; font: 12px 'IBM Plex Sans', sans-serif; }
+      .line { stroke: #8ce7df; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
+      .dash { stroke: #7dd3fc; stroke-width: 2; fill: none; stroke-dasharray: 7 6; marker-end: url(#arrowBlue); }
+      .warn { fill: #fbbf24; font: 12px 'IBM Plex Sans', sans-serif; }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8ce7df"/>
+    </marker>
+    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7dd3fc"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" width="1280" height="520"/>
+
+  <rect class="box" x="40" y="80" width="180" height="110"/>
+  <text class="title" x="92" y="118">Agent</text>
+  <text class="label" x="58" y="145">Tail files by source type</text>
+  <text class="label" x="58" y="164">Offset tracking + spool</text>
+  <text class="note" x="58" y="184">Failure: keeps local spool</text>
+
+  <rect class="box" x="280" y="80" width="180" height="110"/>
+  <text class="title" x="334" y="118">API</text>
+  <text class="label" x="300" y="145">Auth + XADD only</text>
+  <text class="label" x="300" y="164">No parsing in request path</text>
+  <text class="note" x="300" y="184">Failure: ingest stops if Redis fails</text>
+
+  <rect class="redis" x="520" y="40" width="220" height="150"/>
+  <text class="title" x="562" y="78">Redis</text>
+  <text class="label" x="540" y="108">Streams: `siem:ingest`, `siem:alerts`</text>
+  <text class="label" x="540" y="128">State: windows, distinct sets, dedupe</text>
+  <text class="label" x="540" y="148">Pub/Sub: live dashboard feed</text>
+  <text class="warn" x="540" y="172">Transient state only</text>
+
+  <rect class="box" x="800" y="40" width="220" height="150"/>
+  <text class="title" x="826" y="78">Backend Worker</text>
+  <text class="label" x="820" y="108">XREADGROUP -> normalize</text>
+  <text class="label" x="820" y="128">detect -> correlate -> persist</text>
+  <text class="label" x="820" y="148">XACK after successful processing</text>
+  <text class="note" x="820" y="172">No pending-entry reclaim logic</text>
+
+  <rect class="db" x="1080" y="40" width="160" height="150"/>
+  <text class="title" x="1104" y="78">PostgreSQL</text>
+  <text class="label" x="1098" y="108">events</text>
+  <text class="label" x="1098" y="128">alerts</text>
+  <text class="label" x="1098" y="148">integrity_chain</text>
+
+  <rect class="box" x="800" y="280" width="220" height="130"/>
+  <text class="title" x="842" y="318">Alert Worker</text>
+  <text class="label" x="820" y="348">Consumes `siem:alerts`</text>
+  <text class="label" x="820" y="368">Sends SMTP / webhook</text>
+  <text class="note" x="820" y="390">Only high and critical alerts</text>
+
+  <rect class="ui" x="1080" y="260" width="160" height="90"/>
+  <text class="title" x="1110" y="300">Dashboard</text>
+  <text class="label" x="1095" y="326">HTTP bootstrap + WebSocket</text>
+
+  <rect class="ui" x="1080" y="380" width="160" height="90"/>
+  <text class="title" x="1122" y="418">Analyst</text>
+  <text class="label" x="1100" y="444">Reads live and stored alerts</text>
+
+  <line class="line" x1="220" y1="135" x2="280" y2="135"/>
+  <line class="line" x1="460" y1="135" x2="520" y2="115"/>
+  <line class="line" x1="740" y1="115" x2="800" y2="115"/>
+  <line class="line" x1="1020" y1="115" x2="1080" y2="115"/>
+  <line class="line" x1="910" y1="190" x2="910" y2="280"/>
+  <line class="dash" x1="630" y1="190" x2="630" y2="435"/>
+  <line class="dash" x1="630" y1="435" x2="1080" y2="435"/>
+  <line class="line" x1="1020" y1="330" x2="1080" y2="305"/>
+  <line class="line" x1="1160" y1="350" x2="1160" y2="380"/>
+
+  <text class="label" x="652" y="326">Pub/Sub live events/alerts</text>
+  <text class="label" x="930" y="248">alert stream</text>
+  <text class="label" x="1042" y="296">WebSocket</text>
+</svg>
