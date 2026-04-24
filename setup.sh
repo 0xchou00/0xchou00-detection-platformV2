@@ -22,6 +22,32 @@ command -v apt-get >/dev/null 2>&1 || {
   exit 1
 }
 
+if [[ ! -f "$ENV_FILE" && -f "$ENV_EXAMPLE" ]]; then
+  log "Creating .env from .env.example"
+  cp "$ENV_EXAMPLE" "$ENV_FILE"
+fi
+
+if [[ -r /etc/os-release ]]; then
+  # shellcheck disable=SC1091
+  source /etc/os-release
+fi
+
+DISTRO_ID="${ID:-}"
+DISTRO_LIKE="${ID_LIKE:-}"
+
+case "${DISTRO_ID,,}" in
+  kali|debian|ubuntu)
+    log "Detected distro: ${DISTRO_ID:-unknown}"
+    ;;
+  *)
+    if [[ "${DISTRO_LIKE,,}" != *debian* ]]; then
+      err "Unsupported distribution. This script targets Kali, Debian, and Ubuntu."
+      exit 1
+    fi
+    log "Detected Debian-like distro: ${DISTRO_ID:-unknown}"
+    ;;
+esac
+
 log "Updating apt package index"
 $SUDO apt-get update -y
 
@@ -30,7 +56,6 @@ $SUDO apt-get install -y --no-install-recommends \
   ca-certificates \
   curl \
   docker.io \
-  docker-compose-plugin \
   git \
   hydra \
   nodejs \
@@ -41,6 +66,23 @@ $SUDO apt-get install -y --no-install-recommends \
   python3-pip \
   python3-venv
 
+if command -v docker-compose >/dev/null 2>&1; then
+  log "docker-compose is already available"
+else
+  if $SUDO apt-get install -y --no-install-recommends docker-compose; then
+    log "Installed docker-compose from apt"
+  else
+    log "docker-compose package unavailable; installing Python fallback"
+    python3 -m pip install --user --upgrade docker-compose
+    export PATH="$HOME/.local/bin:$PATH"
+  fi
+fi
+
+if command -v systemctl >/dev/null 2>&1; then
+  log "Ensuring Docker service is running"
+  $SUDO systemctl enable --now docker
+fi
+
 command -v python3 >/dev/null 2>&1 || {
   err "python3 command not found after installation."
   exit 1
@@ -50,11 +92,6 @@ command -v npm >/dev/null 2>&1 || {
   err "npm command not found after installation."
   exit 1
 }
-
-if command -v systemctl >/dev/null 2>&1; then
-  log "Ensuring Docker service is running"
-  $SUDO systemctl enable --now docker
-fi
 
 log "Creating or refreshing virtual environment"
 python3 -m venv "$VENV_DIR"
@@ -72,8 +109,6 @@ mkdir -p "$PROJECT_ROOT/logs" "$LAB_DIR"
 if [[ ! -f "$ENV_FILE" ]]; then
   log "Creating .env from .env.example"
   cp "$ENV_EXAMPLE" "$ENV_FILE"
-else
-  log "Keeping existing .env file"
 fi
 
-log "Setup complete. Next: ./run.sh"
+log "Setup complete. Next: ./scripts/check.sh, then ./run.sh"

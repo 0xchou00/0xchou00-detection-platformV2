@@ -53,7 +53,7 @@ class AlertRecord(Base):
     source_type: Mapped[str] = mapped_column(String(32), index=True)
     source_ip: Mapped[str | None] = mapped_column(String(64), index=True)
     event_count: Mapped[int] = mapped_column(Integer)
-    metadata: Mapped[dict] = mapped_column(JSONB)
+    alert_metadata: Mapped[dict] = mapped_column("metadata", JSONB)
     evidence: Mapped[list] = mapped_column(JSONB)
     integrity_hash: Mapped[str] = mapped_column(String(128), index=True)
 

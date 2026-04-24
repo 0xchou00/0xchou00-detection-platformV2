@@ -352,4 +352,5 @@ async def _record_ingest_audit_safe(
             details=details,
         )
     except Exception:
+        # Audit logging must never block ingestion error handling.
         return

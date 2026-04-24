@@ -251,7 +251,7 @@ class QueryService:
             "source_type": row.source_type,
             "source_ip": row.source_ip,
             "event_count": row.event_count,
-            "metadata": row.metadata,
+            "metadata": row.alert_metadata,
             "evidence": row.evidence,
             "integrity_hash": row.integrity_hash,
         }
@@ -407,7 +407,7 @@ class WorkerPipeline:
                         source_type=alert.source_type,
                         source_ip=alert.source_ip,
                         event_count=alert.event_count,
-                        metadata=payload["metadata"],
+                        alert_metadata=payload["metadata"],
                         evidence=alert.evidence,
                         integrity_hash=integrity_hash,
                     )

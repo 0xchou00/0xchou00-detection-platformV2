@@ -24,6 +24,11 @@ services:
     ports:
       - "6379:6379"
     command: ["redis-server", "--appendonly", "yes", "--save", "60", "10000"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
     volumes:
       - redis_data:/data
 
@@ -58,7 +63,7 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
     env_file:
       - .env
     ports:
@@ -75,7 +80,7 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
     env_file:
       - .env
     command: ["python", "worker.py"]
@@ -88,7 +93,7 @@ services:
     container_name: siem-alert-worker
     depends_on:
       redis:
-        condition: service_started
+        condition: service_healthy
     env_file:
       - .env
     command: ["python", "alert_worker.py"]

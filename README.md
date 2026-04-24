@@ -587,6 +587,7 @@ Minimal commands:
 git clone https://github.com/0xchou00/0xchou00-detection-platformV2.git
 cd 0xchou00-detection-platformV2
 ./setup.sh
+./scripts/check.sh
 ./run.sh
 ./test.sh
 ```
@@ -619,6 +620,25 @@ Basic troubleshooting:
   - verify `/health` and `/alerts` first, then inspect browser WebSocket connectivity
 - dead-letter count is growing:
   - inspect `/dead-letters` and `/ingest-audit` before restarting services
+
+Kali Linux compatibility:
+
+- use `./setup.sh` on Kali, Debian, or Ubuntu
+- `setup.sh` installs `docker.io` plus `docker-compose` when available and falls back to the Python package if the OS repository does not provide it
+- `./scripts/check.sh` validates Docker, compose, and memory before the stack starts
+
+Common errors and fixes:
+
+- `.env is missing`:
+  - run `./setup.sh` again, or copy `.env.example` to `.env`
+- `docker-compose` not found:
+  - rerun `./setup.sh`; it installs the OS package first and falls back when needed
+- `docker daemon is not running or the current user cannot access it`:
+  - run `./scripts/check.sh` to see the exact failure, then add the user to the `docker` group or run the stack with passwordless `sudo`
+- `Attribute name 'metadata' is reserved`:
+  - update to the current `backend/app/v2/db.py`; the alert model now uses `alert_metadata`
+- `ERR_CONNECTION_REFUSED` on the dashboard:
+  - check `./run.sh` output and the backend logs; the dashboard depends on the API being up first
 
 ## 12. Design Trade-offs
 

@@ -118,7 +118,7 @@ class IntegrityService:
                 "source_ip": alert.source_ip,
                 "event_count": alert.event_count,
                 "evidence": alert.evidence,
-                "metadata": alert.metadata,
+                "metadata": alert.alert_metadata,
                 "created_at": alert.created_at.astimezone(timezone.utc).isoformat(),
             }
             return _sha(json.dumps(payload, sort_keys=True, default=str))
